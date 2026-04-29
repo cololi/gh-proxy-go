@@ -9,7 +9,7 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-# Copy all source files with the new directory structure.
+# Copy all source files
 COPY cmd/   ./cmd/
 COPY internal/ ./internal/
 
@@ -17,14 +17,13 @@ COPY internal/ ./internal/
 RUN CGO_ENABLED=0 GOOS=linux go build \
       -ldflags="-s -w" \
       -trimpath \
-      -o /out/gh-proxy ./cmd/gh-proxy/
+      -o /out/mirror-go ./cmd/mirror-go/
 
 # ---- runtime stage ----
-# Distroless: no shell, no package manager, runs as nonroot by default.
 FROM gcr.io/distroless/static-debian12:nonroot
 
-COPY --from=builder /out/gh-proxy /gh-proxy
+COPY --from=builder /out/mirror-go /mirror-go
 
 EXPOSE 8080
 USER nonroot:nonroot
-ENTRYPOINT ["/gh-proxy"]
+ENTRYPOINT ["/mirror-go"]

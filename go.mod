@@ -1,3 +1,3 @@
-module github.com/cololi/gh-proxy
+module github.com/cololi/MirrorGo
 
 go 1.22

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cololi/gh-proxy/internal/config"
-	"github.com/cololi/gh-proxy/internal/matcher"
+	"github.com/cololi/MirrorGo/internal/config"
+	"github.com/cololi/MirrorGo/internal/matcher"
 )
 
 const maxRedirectDepth = 5
@@ -144,43 +144,9 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request, path string)
 		return
 	}
 
-	if len(p.cfg.WhiteList) > 0 && !config.AnyMatch(p.cfg.WhiteList, groups) {
-		http.Error(w, "白名单限制访问", http.StatusForbidden)
-		return
-	}
-	if config.AnyMatch(p.cfg.BlackList, groups) {
-		http.Error(w, "黑名单禁止访问", http.StatusForbidden)
-		return
-	}
-	passBy := config.AnyMatch(p.cfg.PassList, groups)
-
-	// jsDelivr 重写 (仅针对 GitHub)
-	if (p.cfg.JSDelivr || passBy) && !matcher.IsHF(target) {
-		if matcher.IsBlob(target) {
-			jd := strings.Replace(target, "/blob/", "@", 1)
-			jd = strings.Replace(jd, "github.com", "cdn.jsdelivr.net/gh", 1)
-			http.Redirect(w, r, jd, http.StatusFound)
-			return
-		}
-		if matcher.IsRaw(target) {
-			jd := matcher.RawRewrite().ReplaceAllString(target, "${1}@${2}")
-			swapped := strings.Replace(jd, "raw.githubusercontent.com", "cdn.jsdelivr.net/gh", 1)
-			if swapped == jd {
-				swapped = strings.Replace(jd, "raw.github.com", "cdn.jsdelivr.net/gh", 1)
-			}
-			http.Redirect(w, r, swapped, http.StatusFound)
-			return
-		}
-	}
-
 	// 自动将 blob 转换为 raw
 	if matcher.IsBlob(target) {
 		target = strings.Replace(target, "/blob/", "/raw/", 1)
-	}
-
-	if passBy {
-		http.Redirect(w, r, target, http.StatusFound)
-		return
 	}
 
 	p.streamProxy(w, r.Context(), target, r.Method, r.Body, r.Header, 0)
@@ -306,7 +272,7 @@ func isHopByHop(h string) bool {
 const defaultIndexHTML = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gh-proxy</title>
+<title>MirrorGo</title>
 <style>
   body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px;
          margin: 60px auto; padding: 0 24px; color: #222; }
@@ -321,7 +287,7 @@ const defaultIndexHTML = `<!DOCTYPE html>
         font-size: 13px; overflow-x: auto; }
 </style></head>
 <body>
-  <h1>GitHub / Hugging Face 代理</h1>
+  <h1>MirrorGo - GitHub / Hugging Face 代理</h1>
   <p>在下方输入 GitHub 或 Hugging Face 的 URL，然后按回车确认。</p>
   <form method="get" action="/">
     <input name="q" placeholder="https://github.com/user/repo/..." autofocus required>

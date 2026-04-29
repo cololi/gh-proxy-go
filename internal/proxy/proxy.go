@@ -3,7 +3,6 @@ package proxy
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log"
 	"net"
@@ -26,8 +25,7 @@ type Proxy struct {
 	client  *http.Client
 	bufPool sync.Pool
 
-	indexHTML  []byte
-	faviconICO []byte
+	indexHTML []byte
 }
 
 // New 根据给定配置创建一个新的 Proxy。
@@ -56,48 +54,14 @@ func New(cfg *config.Config) *Proxy {
 				return http.ErrUseLastResponse
 			},
 		},
+		indexHTML: []byte(defaultIndexHTML),
 	}
 	p.bufPool.New = func() any {
 		buf := make([]byte, cfg.BufferSize)
 		return &buf
 	}
 
-	p.loadAssets()
 	return p
-}
-
-// loadAssets 在启动时从 AssetURL 获取首页 HTML 和 favicon。
-// 失败时将回退到内置的极简首页。
-func (p *Proxy) loadAssets() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if data, err := fetchSmall(ctx, p.cfg.AssetURL); err == nil {
-		p.indexHTML = data
-	} else {
-		log.Printf("警告: 无法从 %s 获取首页: %v (使用内置备用页面)", p.cfg.AssetURL, err)
-		p.indexHTML = []byte(defaultIndexHTML)
-	}
-
-	if data, err := fetchSmall(ctx, p.cfg.AssetURL+"/favicon.ico"); err == nil {
-		p.faviconICO = data
-	}
-}
-
-func fetchSmall(ctx context.Context, u string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(resp.Status)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 }
 
 // ServeHTTP 实现 http.Handler 接口。
@@ -114,13 +78,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(p.indexHTML)
 		return
 	case "favicon.ico":
-		if len(p.faviconICO) == 0 {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "image/vnd.microsoft.icon")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		_, _ = w.Write(p.faviconICO)
+		// 由于删除了 ASSET_URL，不再动态获取 favicon。
+		http.NotFound(w, r)
 		return
 	case "healthz":
 		w.WriteHeader(http.StatusOK)
@@ -138,9 +97,8 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request, path string)
 	}
 	target = normalizeURL(target)
 
-	groups := matcher.MatchURL(target)
-	if groups == nil {
-		http.Error(w, "无效的输入", http.StatusForbidden)
+	if matcher.MatchURL(target) == nil {
+		http.Error(w, "无效的输入 URL", http.StatusForbidden)
 		return
 	}
 
@@ -152,9 +110,6 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request, path string)
 	p.streamProxy(w, r.Context(), target, r.Method, r.Body, r.Header, 0)
 }
 
-// streamProxy 从上游获取目标资源并将其流式传输回客户端。
-// 对于带有 Location 响应头的 3xx 响应，它会重写该头以便通过代理重定向，
-// 或者在服务器端跟随重定向（取决于 Location 是否匹配已知的模式）。
 func (p *Proxy) streamProxy(
 	w http.ResponseWriter,
 	ctx context.Context,
@@ -237,7 +192,6 @@ func drainAndClose(r io.ReadCloser) {
 	_ = r.Close()
 }
 
-// normalizeURL 确保 URL 是可用的绝对路径。
 func normalizeURL(u string) string {
 	if !strings.HasPrefix(u, "http") {
 		u = "https://" + u
@@ -270,32 +224,35 @@ func isHopByHop(h string) bool {
 }
 
 const defaultIndexHTML = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hub-Proxy-Go</title>
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px;
-         margin: 60px auto; padding: 0 24px; color: #222; }
-  h1 { margin-bottom: 8px; }
-  p { color: #666; margin-top: 0; }
-  form { display: flex; gap: 8px; margin: 24px 0; }
-  input { flex: 1; padding: 12px 14px; font-size: 16px;
-          border: 1px solid #ccc; border-radius: 6px; }
-  button { padding: 12px 18px; font-size: 16px; border: 0;
-           background: #0366d6; color: #fff; border-radius: 6px; cursor: pointer; }
-  pre { background: #f6f8fa; padding: 12px 16px; border-radius: 6px;
-        font-size: 13px; overflow-x: auto; }
-</style></head>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hub-Proxy-Go</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 60px auto; padding: 0 24px; color: #222; line-height: 1.5; }
+        h1 { margin-bottom: 8px; font-weight: 700; }
+        p { color: #666; margin-top: 0; }
+        form { display: flex; gap: 8px; margin: 24px 0; }
+        input { flex: 1; padding: 12px 14px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        input:focus { border-color: #0366d6; box-shadow: 0 0 0 3px rgba(3,102,214,0.1); }
+        button { padding: 12px 18px; font-size: 16px; border: 0; background: #0366d6; color: #fff; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #0255b3; }
+        h3 { margin-top: 32px; font-size: 18px; }
+        pre { background: #f6f8fa; padding: 12px 16px; border-radius: 6px; font-size: 13px; overflow-x: auto; color: #444; border: 1px solid #eaecef; }
+    </style>
+</head>
 <body>
-  <h1>Hub-Proxy-Go - GitHub / Hugging Face 代理</h1>
-  <p>在下方输入 GitHub 或 Hugging Face 的 URL，然后按回车确认。</p>
-  <form method="get" action="/">
-    <input name="q" placeholder="https://github.com/user/repo/..." autofocus required>
-    <button type="submit">前往</button>
-  </form>
-  <h3>示例</h3>
-  <pre>https://github.com/user/repo/releases/download/v1.0/file.zip
+    <h1>Hub-Proxy-Go</h1>
+    <p>GitHub 和 Hugging Face 加速代理。在下方输入 URL 即可开始。</p>
+    <form method="get" action="/">
+        <input name="q" placeholder="https://github.com/user/repo/..." autofocus required>
+        <button type="submit">前往</button>
+    </form>
+    <h3>示例</h3>
+    <pre>https://github.com/user/repo/releases/download/v1.0/file.zip
 https://github.com/user/repo/archive/refs/heads/main.zip
 https://raw.githubusercontent.com/user/repo/main/README.md
 https://huggingface.co/gpt2/resolve/main/config.json</pre>
-</body></html>`
+</body>
+</html>`

@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// 预编译的 URL 模式匹配器。
 var (
 	expRelease = regexp.MustCompile(`^(?:https?://)?github\.com/([^/]+?)/([^/]+?)/(?:releases|archive)/.*$`)
 	expBlob    = regexp.MustCompile(`^(?:https?://)?github\.com/([^/]+?)/([^/]+?)/(?:blob|raw)/.*$`)

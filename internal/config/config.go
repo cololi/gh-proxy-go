@@ -10,7 +10,6 @@ import (
 // Config 存储从环境变量加载的所有配置。
 type Config struct {
 	Listen          string
-	AssetURL        string
 	SizeLimit       int64
 	BufferSize      int
 	UpstreamTimeout time.Duration
@@ -20,42 +19,41 @@ type Config struct {
 // Load 从环境变量读取配置，并设置默认值。
 func Load() *Config {
 	return &Config{
-		Listen:          env("LISTEN", ":8080"),
-		AssetURL:        env("ASSET_URL", "https://hunshcn.github.io/gh-proxy"),
-		SizeLimit:       envInt64("SIZE_LIMIT", 1072668082176),
-		BufferSize:      int(envInt64("BUFFER_SIZE", 32*1024)),
-		UpstreamTimeout: envDuration("UPSTREAM_TIMEOUT", 30*time.Second),
-		ShutdownTimeout: envDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		Listen:          getEnv("LISTEN", ":8080"),
+		SizeLimit:       getEnvInt64("SIZE_LIMIT", 1072668082176),
+		BufferSize:      int(getEnvInt64("BUFFER_SIZE", 32*1024)),
+		UpstreamTimeout: getEnvDuration("UPSTREAM_TIMEOUT", 30*time.Second),
+		ShutdownTimeout: getEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 	}
 }
 
-func env(key, def string) string {
+func getEnv(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	return def
+	return defaultValue
 }
 
-func envInt64(key string, def int64) int64 {
+func getEnvInt64(key string, defaultValue int64) int64 {
 	v := os.Getenv(key)
 	if v == "" {
-		return def
+		return defaultValue
 	}
 	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
-		return def
+		return defaultValue
 	}
 	return n
 }
 
-func envDuration(key string, def time.Duration) time.Duration {
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	v := os.Getenv(key)
 	if v == "" {
-		return def
+		return defaultValue
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil {
-		return def
+		return defaultValue
 	}
 	return d
 }

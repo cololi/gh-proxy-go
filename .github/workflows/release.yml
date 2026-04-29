@@ -1,0 +1,39 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Build binaries
+        run: make dist
+
+      - name: Generate Checksums
+        run: |
+          cd bin
+          sha256sum * > checksums.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/*
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

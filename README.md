@@ -26,12 +26,39 @@ GitHub 和 Hugging Face 加速代理的 Go 重写版本。支持 Git Clone、Rel
 docker run -d --name gh-proxy -p 8080:8080 --restart always cololi/gh-proxy:latest
 ```
 
-### 2. 本地编译运行
+### 2. 使用 systemd (Linux 推荐)
+
+1. 下载或编译 `gh-proxy` 二进制文件：
+   ```bash
+   make build
+   sudo cp gh-proxy /usr/local/bin/
+   ```
+2. 创建服务文件 `/etc/systemd/system/gh-proxy.service` (参考 `deployments/gh-proxy.service`)：
+   ```ini
+   [Unit]
+   Description=gh-proxy-go
+   After=network.target
+
+   [Service]
+   ExecStart=/usr/local/bin/gh-proxy
+   Restart=always
+   User=root
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+3. 启动并启用服务：
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now gh-proxy
+   ```
+
+### 3. 本地编译运行
 ```bash
 make run
 ```
 
-### 3. Cloudflare Workers
+### 4. Cloudflare Workers
 请查看 [deployments/README.md](deployments/README.md) 获取一键部署脚本。
 
 ## 使用示例

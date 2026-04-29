@@ -1,0 +1,18 @@
+[Unit]
+Description=gh-proxy-go - GitHub and Hugging Face Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=root
+# Set your working directory if needed
+# WorkingDirectory=/path/to/gh-proxy
+ExecStart=/usr/local/bin/gh-proxy
+Restart=always
+RestartSec=5
+# Optional: environment variables
+# Environment=LISTEN=:8080
+# Environment=JSDELIVR=false
+
+[Install]
+WantedBy=multi-user.target
